@@ -1,0 +1,11 @@
+<schools>
+    [%- FOREACH school IN schools %]
+    <school
+        [%- FOREACH key IN school.keys() %]
+            [%- IF school.$key.length %]
+                [% key.replace( "\s+", "_" ) | html %]="[% school.$key | html %]"
+            [%- END %]
+        [%- END %]
+    />
+    [%- END %]
+</schools>

@@ -1,0 +1,38 @@
+<html>
+    <head>
+        <title>[% school.name | html %]</title>
+        <script type="text/javascript" src="/js/yui/build/yahoo/yahoo.js"></script>
+        <script type="text/javascript" src="/js/yui/build/dom/dom.js"></script> 
+        <link type="text/css" rel="stylesheet" href="/css/navbar.css" /> 
+    </head>
+    <body>
+        [%# INCLUDE google.html %]
+        <hr />
+        <h2>[% school.name | html %]</h2>
+        <p>[% school.address | html %]</p>
+        <p>[% school.postcode | html %]</p>
+        <div id="navcontainer">
+            <ul id="navlist">
+                [% FOREACH tab IN tabs %]
+                    <li><a 
+                        [% IF tab.current %]class="current"[% END %]
+                        target="details" 
+                        href="[% tab.url %]"
+                        onclick="
+                            try {
+                                var current = document.getElementsByClassName( 'current' );
+                                current[0].className = '';
+                                this.className = 'current';
+                            }
+                            catch( e ) { alert( e ) }
+                            return true;
+                        "
+                    >[% tab.description | html %]</a></li>
+                [% END %]
+            </ul>
+        </div>
+        <iframe style="border: 0" name="details" width="100%" height="100%" src="[% iframe_source %]"></iframe>
+        <hr />
+        [% INCLUDE footer.html %]
+    </body>
+</html>

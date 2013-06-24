@@ -1,0 +1,136 @@
+* {
+    font-family: verdana,sans-serif;
+    font-size: 20px;
+}
+
+.disabled {
+    color: black;
+    background-color: white;
+    border: 0;
+}
+
+#header {
+    background-color: #82CAFA;
+    width: 100%;
+    padding: 10px;
+}
+
+#header h1 {
+    color: white;
+    text-align: center;
+}
+
+#content {
+    padding: 10px;
+}
+
+#footer {
+    background-color: #82CAFA;
+    width: 100%;
+    padding: 10px;
+}
+
+#footer * {
+    font-size: 10px;
+}
+
+#footer td {
+    width: 20%;
+}
+
+img { border: 0px }
+.small { font-size: xx-small }
+
+a {
+    text-decoration: none;
+    color: blue;
+}
+
+a:hover {
+    color: red;
+}
+
+#map * { 
+    font-size: 10px;
+}
+
+#map { 
+    border: 1px solid black; 
+    width: 100%; height: 300px;
+    float: left;
+}
+
+table {
+    width: 100%;
+}
+
+td {
+    vertical-align: top;
+}
+
+td#go {
+    text-align: right;
+    vertical-align: bottom;
+    padding-bottom: 25px;
+}
+
+td#inputs {
+    width: 100%;
+    text-align: left;
+}
+
+table#main td.half {
+    width: 50%;
+    padding: 5px;
+}
+
+#coords { 
+    display: none;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+#directions {
+    display: none;
+    width: 0; 
+    height: 0;
+}
+
+div#layers {
+    position: relative;
+    top: -50px;
+    left: 40%;
+    width: 200px;
+    font-size: 10px;
+}
+
+#layers * { 
+    font-size: 10px;
+}
+
+#linkto { 
+    font-size: 10px;
+}
+
+#linkto * { 
+    font-size: 10px;
+}
+
+#list * { 
+    font-size: 10px;
+}
+
+.error {
+    color: red;
+}
+
+li { padding: 5px; }
+
+.infoWindow {
+    width: 150px;
+    height: 130px;
+}
+
+input#address {
+    width: 400px;
+}
