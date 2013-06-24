@@ -9,6 +9,9 @@ use Template;
 use Data::Dumper;
 use JSON;
 
+my @from = ( "edubase", "dcsf", "ofsted" );
+my $from = join( ",", @from );
+
 sub new
 {
     my $class = shift;
@@ -64,7 +67,8 @@ sub _get_types
     my ( $all ) = $sth->fetchrow;
     # my @types = ( { val => "all", str => "all ($all)" } );
     my @types = ( { val => "all", str => "all" } );
-    $sql = "SELECT school_type, COUNT(*) AS c FROM dcsf,school,postcode $where AND school_type IS NOT NULL GROUP BY school_type ORDER BY c DESC";
+    $sql = "SELECT school_type, COUNT(*) AS c FROM $from $where AND school_type IS NOT NULL GROUP BY school_type ORDER BY c DESC";
+    warn $sql;
     $sth = $self->{dbh}->prepare( $sql );
     $sth->execute( @args );
     while ( my ( $type, $count ) = $sth->fetchrow )
@@ -168,8 +172,6 @@ sub get_schools
         push( @where, 'school.name LIKE ?' );
         push( @args, "%" . $self->{find_school} ."%" );
     }
-    my @from = ( "edubase", "dcsf", "ofsted" );
-    my $from = join( ",", @from );
     if ( $self->{order_by} )
     {
         push( @where, "average_$self->{order_by} IS NOT NULL" );
