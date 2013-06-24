@@ -58,7 +58,7 @@ sub _get_types
     my $self = shift;
     my ( $where, @args ) = $self->geo_where();
     warn $where;
-    my $sql = "SELECT COUNT(*) FROM dcsf,school,postcode $where";
+    my $sql = "SELECT COUNT(*) FROM dcsf,ofsted,edubase $where";
     my $sth = $self->{dbh}->prepare( $sql );
     $sth->execute( @args );
     my ( $all ) = $sth->fetchrow;
@@ -114,18 +114,18 @@ sub geo_where
     my $self = shift;
     my @args;
     my @where = ( 
-        "school.postcode = postcode.code", 
-        "school.dcsf_id = dcsf.dcsf_id",
+        "edubase.URN = dcsf.URN", 
+        "edubase.URN = ofsted.ofsted_id", 
     );
     if ( $self->{minLon} && $self->{maxLon} && $self->{minLat} && $self->{maxLat} )
     {
         push( 
             @where,
             (
-                "postcode.lon > ?",
-                "postcode.lon < ?",
-                "postcode.lat > ?",
-                "postcode.lat < ?",
+                "edubase.lon > ?",
+                "edubase.lon < ?",
+                "edubase.lat > ?",
+                "edubase.lat < ?",
             )
         );
         push( @args, $self->{minLon}, $self->{maxLon}, $self->{minLat}, $self->{maxLat} );
@@ -142,19 +142,18 @@ sub get_schools
 
     my @args;
     my @where = ( 
-        "school.postcode = postcode.code", 
-        "school.dcsf_id = dcsf.dcsf_id", 
-        "school.ofsted_id = ofsted.ofsted_id", 
+        "edubase.URN = dcsf.URN", 
+        "edubase.URN = ofsted.ofsted_id", 
     );
     if ( $self->{minLon} && $self->{maxLon} && $self->{minLat} && $self->{maxLat} )
     {
         push( 
             @where,
             (
-                "postcode.lon > ?",
-                "postcode.lon < ?",
-                "postcode.lat > ?",
-                "postcode.lat < ?",
+                "edubase.lon > ?",
+                "edubase.lon < ?",
+                "edubase.lat > ?",
+                "edubase.lat < ?",
             )
         );
         push( @args, $self->{minLon}, $self->{maxLon}, $self->{minLat}, $self->{maxLat} );
@@ -169,7 +168,7 @@ sub get_schools
         push( @where, 'school.name LIKE ?' );
         push( @args, "%" . $self->{find_school} ."%" );
     }
-    my @from = ( "postcode", "school", "dcsf", "ofsted" );
+    my @from = ( "edubase", "dcsf", "ofsted" );
     my $from = join( ",", @from );
     if ( $self->{order_by} )
     {

@@ -21,7 +21,6 @@ require HTML::TableExtract;
 use DBI;
 use lib "$Bin/lib";
 require CreateSchool;
-use Acronyms;
 use URI::URL;
 use Data::Dumper;
 
@@ -54,7 +53,7 @@ sub get_types
 my %opts;
 my @opts = qw( year=s force flush region=s la=s school=s type=s force silent pidfile! verbose );
 
-my ( $dbh, $school_creator, $acronyms, %done );
+my ( $dbh, $school_creator, %done );
 
 sub get_id
 {
@@ -98,6 +97,7 @@ sub update_school
     $school{address} = join( ",", @data{qw( Street Town Postcode )} );
     $school{postcode} = $data{Postcode};
     $school{type} = $data{"School type"};
+    $school{URN} = $data{"Unique Reference Number"};
     warn Dumper \%school;
     # SCHDATA={"code":125421,"x":-0.398859565522962,"y":51.3465648147044,"name":"ACS Cobham International School"};
     my ( $lat, $lon ) = $html =~ /SCHDATA={"code":\d+,"x":([-\d\.]+),"y":([-\d\.]+)/;
@@ -132,29 +132,24 @@ sub update_school
         warn "no score index\n";
     }
     return unless $score;
-    my @acronyms = $html =~ m{<a .*?class="acronym".*?>(.*?)</a>}gism;
-    #warn "\t\t\t(lat:$lat, lon:$lon, score:$score, pupils:$pupils, acronyms:@acronyms)\n";
-    my $dsth = $dbh->prepare( "DELETE FROM acronym WHERE dcsf_id = ?" );
-    my $isth = $dbh->prepare( "INSERT INTO acronym ( dcsf_id, acronym, type ) VALUES ( ?,?,? )" );
-    $dsth->execute( $school{dcsf_id} );
     my $select_sql = "SELECT dcsf_id FROM dcsf WHERE dcsf_id = ?";
     my $select_sth = $dbh->prepare( $select_sql );
     $select_sth->execute( $school{dcsf_id} );
     if ( $select_sth->fetchrow )
     {
         my $update_sql = <<EOF;
-UPDATE dcsf SET type = ?, school_type = ?, dcsf_url = ?, average_${type} = ?, pupils_${type} = ? WHERE dcsf_id = ?
+UPDATE dcsf SET URN = ?, type = ?, school_type = ?, dcsf_url = ?, average_${type} = ?, pupils_${type} = ? WHERE dcsf_id = ?
 EOF
         my $update_sth = $dbh->prepare( $update_sql );
-        $update_sth->execute( $type, $school{type}, $school_url, $score, $pupils, $school{dcsf_id} );
+        $update_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $pupils, $school{dcsf_id} );
     }
     else
     {
         my $insert_sql = <<EOF;
-INSERT INTO dcsf (type,school_type,dcsf_url,average_${type},pupils_${type},dcsf_id) VALUES(?,?,?,?,?,?)
+INSERT INTO dcsf (URN,type,school_type,dcsf_url,average_${type},pupils_${type},dcsf_id) VALUES(?,?,?,?,?,?,?)
 EOF
         my $insert_sth = $dbh->prepare( $insert_sql );
-        $insert_sth->execute( $type, $school{type}, $school_url, $score, $pupils, $school{dcsf_id} );
+        $insert_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $pupils, $school{dcsf_id} );
     }
     $done{$school{dcsf_id}} = $school_name;
 }
@@ -170,10 +165,9 @@ if ( $opts{pidfile} )
 {
     $pp = Proc::Pidfile->new( silent => $opts{silent} );
 }
-my $logfile = "$Bin/logs/dcsf.log";
+my $logfile = "/var/log/schoolmap/dcsf.log";
 $dbh = DBI->connect( 'DBI:mysql:schoolmap', 'schoolmap', 'schoolmap', { RaiseError => 1, PrintError => 0 } );
 $school_creator = CreateSchool->new( dbh => $dbh );
-$acronyms = Acronyms->new();
 unless ( $opts{verbose} )
 {
     open( STDERR, ">$logfile" ) or die "can't write to $logfile\n";

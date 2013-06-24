@@ -8,6 +8,7 @@ use CGI::Lite;
 require DBI;
 use Template;
 use Data::Dumper;
+use FindBin qw( $Bin );
 
 sub new
 {
@@ -75,7 +76,8 @@ sub html
     warn "iframe_source: $key $iframe_source\n";
     my $tabs = $self->get_tabs( $school );
     warn Dumper $tabs;
-    my $tt = Template->new( { INCLUDE_PATH => "/var/www/www.schoolmap.org.uk/templates" } );
+    my $tt = Template->new( { INCLUDE_PATH => "$Bin/../templates" } );
+    warn "../$Bin/templates";
     $tt->process(
         "school.html", 
         { 
@@ -83,7 +85,7 @@ sub html
             tabs => $tabs,
             iframe_source => $iframe_source,
         }
-    );
+    ) || die $tt->error();
 }
 
 #------------------------------------------------------------------------------

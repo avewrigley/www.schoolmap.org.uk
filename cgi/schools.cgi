@@ -22,7 +22,7 @@ my %mimetype = (
     json => "application/json",
     # json => "text/plain",
 );
-open( STDERR, ">>/var/www/www.schoolmap.org.uk/logs/schools.log" );
+open( STDERR, ">>/var/log/schoolmap/schools.log" );
 warn "$$ at ", scalar( localtime ), "\n";
 my %formdata = ( format => "json", CGI::Lite->new->parse_form_data() );
 warn map "$_ = $formdata{$_}\n", keys %formdata;

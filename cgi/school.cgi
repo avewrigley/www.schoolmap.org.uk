@@ -15,7 +15,7 @@ use FindBin qw( $Bin );
 use lib "$Bin/../lib";
 require School;
 
-open( STDERR, ">>$Bin/../logs/school.log" );
+open( STDERR, ">>/var/log/schoolmap/school.log" );
 warn "$$ at ", scalar( localtime ), "\n";
 my %formdata = CGI::Lite->new->parse_form_data();
 print "Content-Type: text/html\n\n";
