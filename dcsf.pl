@@ -34,17 +34,14 @@ sub get_types
     return (
         primary => {
             type_regex => qr/Primary/,
-            pupil_key => 'Total number of pupils on roll (all ages)',
             score_index => 2,
         },
         secondary => {
             type_regex => qr/Secondary/,
-            pupil_key => 'Total number of pupils on roll (all ages)',
             score_index => 9,
         },
         post16 => {
             type_regex => qr/16-18/,
-            pupil_key => 'Total number of pupils on roll (all ages)',
             score_index => 5,
         },
     );
@@ -106,9 +103,6 @@ sub update_school
         $school{lat} = $lat, $school{lon} = $lon;
     }
     $school_creator->create_school( 'dcsf', %school );
-    my $pupil_key = $types{$type}{pupil_key};
-    my $pupils = $data{$pupil_key};
-    warn "no pupils under $pupil_key" unless $pupils;
     my $score;
     if ( my $i = $types{$type}{score_index} )
     {
@@ -138,18 +132,18 @@ sub update_school
     if ( $select_sth->fetchrow )
     {
         my $update_sql = <<EOF;
-UPDATE dcsf SET URN = ?, type = ?, school_type = ?, dcsf_url = ?, average_${type} = ?, pupils_${type} = ? WHERE dcsf_id = ?
+UPDATE dcsf SET URN = ?, type = ?, school_type = ?, dcsf_url = ?, average_${type} = ? WHERE dcsf_id = ?
 EOF
         my $update_sth = $dbh->prepare( $update_sql );
-        $update_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $pupils, $school{dcsf_id} );
+        $update_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $school{dcsf_id} );
     }
     else
     {
         my $insert_sql = <<EOF;
-INSERT INTO dcsf (URN,type,school_type,dcsf_url,average_${type},pupils_${type},dcsf_id) VALUES(?,?,?,?,?,?,?)
+INSERT INTO dcsf (URN,type,school_type,dcsf_url,average_${type},dcsf_id) VALUES(?,?,?,?,?,?)
 EOF
         my $insert_sth = $dbh->prepare( $insert_sql );
-        $insert_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $pupils, $school{dcsf_id} );
+        $insert_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $school{dcsf_id} );
     }
     $done{$school{dcsf_id}} = $school_name;
 }

@@ -14,7 +14,7 @@ use Proc::Pidfile;
 use FindBin qw( $Bin );
 use DBI;
 
-my $logfile = ">/var/log/schoolmap/edubase.log";
+my $logfile = "/var/log/schoolmap/edubase.log";
 my $ofsted_base_url = "http://www.ofsted.gov.uk/oxcare_providers/urn_search?type=2&urn=";
 
 my @keys = qw(
