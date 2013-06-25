@@ -10,6 +10,8 @@ use Template;
 use Data::Dumper;
 use FindBin qw( $Bin );
 
+my $ofsted_base_url = "http://www.ofsted.gov.uk/inspection-reports/find-inspection-report/provider/ELS/";
+
 sub new
 {
     my $class = shift;
@@ -41,18 +43,21 @@ sub get_tabs
     warn Dumper $school;
     return [
         { 
+            url => $school->{WebsiteAddress},
+            description => "School Website" 
+        },
+        { 
             url => "http://en.wikipedia.org/wiki/$wiki_name", 
             description => "Wikipedia entry" 
         },
         { 
-            url => $school->{ofsted_url},
+            url => "$ofsted_base_url/$school->{URN}",
             description => "Ofsted",
-            current => $self->{table} eq 'ofsted' ? 1 : 0,
         },
         { 
             url => $school->{dcsf_url},
             description => "Department of Education",
-            current => $self->{table} eq 'dcsf' ? 1 : 0,
+            current => 1,
         },
     ];
 }
@@ -61,7 +66,7 @@ sub html
 {
     my $self = shift;
 
-    my $school_sql = "SELECT * FROM school LEFT JOIN dcsf USING ( dcsf_id ) LEFT JOIN ofsted USING( ofsted_id ) WHERE school.$self->{table}_id = ?";
+    my $school_sql = "SELECT * FROM edubase,dcsf WHERE edubase.URN = dcsf.URN AND edubase.URN = ?";
     warn "$school_sql\n";
     my $school_sth = $self->{dbh}->prepare( $school_sql );
     $school_sth->execute( $self->{id} );
@@ -69,13 +74,9 @@ sub html
     my $school = $school_sth->fetchrow_hashref;
     $school_sth->finish();
     warn Dumper $school;
-    $self->{current} = 
-    my $key = "$self->{table}_url";
-    warn "key: $key\n";
-    my $iframe_source = $school->{$key};
-    warn "iframe_source: $key $iframe_source\n";
+    my $iframe_source = $school->{dcsf_url};
+    warn "iframe_source: $iframe_source\n";
     my $tabs = $self->get_tabs( $school );
-    warn Dumper $tabs;
     my $tt = Template->new( { INCLUDE_PATH => "$Bin/../templates" } );
     warn "../$Bin/templates";
     $tt->process(

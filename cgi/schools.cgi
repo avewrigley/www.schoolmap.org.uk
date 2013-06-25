@@ -31,17 +31,24 @@ if ( exists $formdata{types} )
     # print "Content-Type: application/json\n\n";
     print "Content-Type: text/plain\n\n";
     Schools->new( %formdata )->types();
-    exit;
 }
-my $mimetype = $mimetype{$formdata{format}};
-print "Content-Type: $mimetype\n\n";
-if ( $formdata{format} eq 'json' )
+elsif ( exists $formdata{phases} )
 {
-    Schools->new( %formdata )->json();
+    print "Content-Type: text/plain\n\n";
+    Schools->new( %formdata )->phases();
 }
 else
 {
-    Schools->new( %formdata )->xml();
+    my $mimetype = $mimetype{$formdata{format}};
+    print "Content-Type: $mimetype\n\n";
+    if ( $formdata{format} eq 'json' )
+    {
+        Schools->new( %formdata )->json();
+    }
+    else
+    {
+        Schools->new( %formdata )->xml();
+    }
 }
 
 #------------------------------------------------------------------------------

@@ -14,15 +14,14 @@ var SCHOOLMAP = {
     },
     request:false,
     curtags:[ "body", "a", "input", "select", "div" ],
-    default_type:{ colour: "ff00ff", active_colour:"ffaaff" },
-    types:{
-        "Community School":{ colour: "f0000f", active_colour:"faaaaf" },
-        "Other Independent School":{ colour: "00ff00", active_colour:"aaffaa" },
-        "Voluntary Aided School":{ colour: "0ffff0", active_colour:"affffa" },
-        "Academy - Converter Mainstream":{ colour: "00ffff", active_colour:"aaffff" },
-        "Sixth Form College":{ colour: "ffff00", active_colour:"ffffaa" },
-        "Foundation School":{ colour: "0000ff", active_colour:"aaaaff" },
-        "General Further Education College":{ colour: "ff0000", active_colour:"ffaaaa" },
+    default_phase:{ colour: "ff00ff", active_colour:"ffaaff" },
+    phases:{
+        "Primary":{ colour: "ff00ff", active_colour:"ffaaff" },
+        "Secondary":{ colour: "00ff00", active_colour:"aaffaa" },
+        "Nursery":{ colour: "ffff00", active_colour:"ffffaa" },
+        "Middle Deemed Primary":{ colour: "00ffff", active_colour:"aaffff" },
+        "Middle Deemed Secondary":{ colour: "ff0000", active_colour:"ffaaaa" },
+        "Not applicable":{ colour: "0000ff", active_colour:"aaaaff" },
     },
     handle_zoom:false,
     handle_move:false,
@@ -256,6 +255,13 @@ SCHOOLMAP.getQueryString = function()
         if ( order_by_val == "distance" ) order_by_val = "";
         query_string = query_string + "&order_by=" + escape( order_by_val );
     }
+    var phase = document.forms[0].phase;
+    if ( phase ) 
+    {
+        var phase_val = phase.value;
+        if ( phase_val == "all" ) phase_val = "";
+        query_string = query_string + "&phase=" + escape( phase_val );
+    }
     var type = document.forms[0].type;
     if ( type ) 
     {
@@ -282,7 +288,6 @@ SCHOOLMAP.typesCallback = function( response )
 {
     console.log( response )
     var types = JSON.parse( response.responseText );
-    console.log( types );
     var sel = document.forms[0].type;
     console.log( document.forms[0] );
     console.log( sel );
@@ -316,7 +321,6 @@ SCHOOLMAP.getSchoolsCallback = function( response )
     var json = JSON.parse( response.responseText );
     if ( SCHOOLMAP.schoolsChanged( json.schools ) )
     {
-        console.log( "schools changed" );
         SCHOOLMAP.removeSchoolMarkers();
         SCHOOLMAP.active_school = false;
         SCHOOLMAP.nschools = json.nschools;
@@ -353,12 +357,12 @@ SCHOOLMAP.redrawSchools = function( callback )
             var school = SCHOOLMAP.schools[i];
             school.no = i+1;
             if ( ! school.school_type ) school.school_type = "unknown";
-            var type = SCHOOLMAP.types[school.school_type];
-            if ( ! type )
+            var phase = SCHOOLMAP.phases[school.PhaseOfEducation];
+            if ( ! phase )
             {
-                type = SCHOOLMAP.default_type;
+                phase = SCHOOLMAP.default_phase;
             }
-            var colour = type.colour;
+            var colour = phase.colour;
             var icon = SCHOOLMAP.createIcon( colour, school.no );
             if ( school.marker )
             {
@@ -401,12 +405,12 @@ SCHOOLMAP.updateList = function( callback )
 SCHOOLMAP.activateSchool = function( school )
 {
     SCHOOLMAP.changeLinksColour( school, "ff4444" );
-    var type = SCHOOLMAP.types[school.school_type];
-    if ( ! type )
+    var phase = SCHOOLMAP.phases[school.PhaseOfEducation];
+    if ( ! phase )
     {
-        type = SCHOOLMAP.default_type;
+        phase = SCHOOLMAP.default_phase;
     }
-    SCHOOLMAP.changeMarkerColour( school, type.active_colour )
+    SCHOOLMAP.changeMarkerColour( school, phase.active_colour )
     if ( SCHOOLMAP.active_school ) SCHOOLMAP.deActivateSchool( SCHOOLMAP.active_school );
     if ( 0 && ! SCHOOLMAP.calculatingDistances )
     {
@@ -429,12 +433,12 @@ SCHOOLMAP.deActivateSchool = function( school )
 {
     if ( ! school ) return;
     SCHOOLMAP.changeLinksColour( school, "4444ff" );
-    var type = SCHOOLMAP.types[school.school_type];
-    if ( ! type )
+    var phase = SCHOOLMAP.phases[school.PhaseOfEducation];
+    if ( ! phase )
     {
-        type = SCHOOLMAP.default_type;
+        phase = SCHOOLMAP.default_phase;
     }
-    SCHOOLMAP.changeMarkerColour( school, type.colour );
+    SCHOOLMAP.changeMarkerColour( school, phase.colour );
     if ( ! SCHOOLMAP.calculatingDistances ) SCHOOLMAP.gdir.clear();
     SCHOOLMAP.active_school = false;
 }
@@ -638,15 +642,6 @@ SCHOOLMAP.createInfoWindow = function( school )
         }
         div.appendChild( p );
     }
-    if ( school.ofsted_url ) 
-    {
-        p = document.createElement( "P" );
-        var a = document.createElement( "A" );
-        a.href = school.ofsted_url;
-        a.appendChild( document.createTextNode( "Ofsted report" ) );
-        p.appendChild( a );
-        div.appendChild( p );
-    }
     return div;
 };
 
@@ -704,9 +699,8 @@ SCHOOLMAP.initTableHead = function( tr, result_types )
     var ths = new Array();
     SCHOOLMAP.createHeadCell( tr, "no" );
     SCHOOLMAP.createHeadCell( tr, "name", "Name of school", 1 );
-    // SCHOOLMAP.createHeadCell( tr, "stage", "School stage" );
+    SCHOOLMAP.createHeadCell( tr, "phase", "School stage" );
     SCHOOLMAP.createHeadCell( tr, "type", "Type of school" );
-    SCHOOLMAP.createHeadCell( tr, "ofsted report", "Link to Ofsted report" );
     for ( var i = 0; i < result_types.length; i++ )
     {
         var result_type = result_types[i];
@@ -924,17 +918,8 @@ SCHOOLMAP.createListRow = function( no, school, result_types )
     }
     tr.appendChild( SCHOOLMAP.createListTd( { "text":no+1, "url":url, "school":school } ) );
     tr.appendChild( SCHOOLMAP.createListTd( { "text":school.name, "url":url, "school":school } ) );
-    // tr.appendChild( SCHOOLMAP.createListTd( { "text":school.type, "url":url, "school":school } ) );
+    tr.appendChild( SCHOOLMAP.createListTd( { "text":school.PhaseOfEducation, "url":url, "school":school } ) );
     tr.appendChild( SCHOOLMAP.createListTd( { "text":school.school_type, "url":url, "school":school } ) );
-    if ( school.ofsted_url ) 
-    {
-        var url = SCHOOLMAP.school_url + "?table=ofsted&id=" + school.ofsted_id;
-        tr.appendChild( SCHOOLMAP.createListTd( { "text":"yes", "url":url, "school":school } ) );
-    }
-    else
-    {
-        tr.appendChild( SCHOOLMAP.createListTd( { text:"no" } ) );
-    }
     for ( var i = 0; i <  result_types.length; i++ )
     {
         var result_type = result_types[i];

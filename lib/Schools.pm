@@ -9,7 +9,7 @@ use Template;
 use Data::Dumper;
 use JSON;
 
-my @from = ( "edubase", "dcsf", "ofsted" );
+my @from = ( "edubase", "dcsf" );
 my $from = join( ",", @from );
 
 sub new
@@ -56,20 +56,20 @@ sub types
     print to_json( $self->_get_types );
 }
 
+sub phases
+{
+    my $self = shift;
+    print to_json( $self->_get_phases );
+}
+
 sub _get_types
 {
     my $self = shift;
     my ( $where, @args ) = $self->geo_where();
     warn $where;
-    my $sql = "SELECT COUNT(*) FROM dcsf,ofsted,edubase $where";
-    my $sth = $self->{dbh}->prepare( $sql );
-    $sth->execute( @args );
-    my ( $all ) = $sth->fetchrow;
-    # my @types = ( { val => "all", str => "all ($all)" } );
     my @types = ( { val => "all", str => "all" } );
-    $sql = "SELECT school_type, COUNT(*) AS c FROM $from $where AND school_type IS NOT NULL GROUP BY school_type ORDER BY c DESC";
-    warn $sql;
-    $sth = $self->{dbh}->prepare( $sql );
+    my $sql = "SELECT school_type, COUNT(*) AS c FROM $from $where AND school_type IS NOT NULL GROUP BY school_type ORDER BY c DESC";
+    my $sth = $self->{dbh}->prepare( $sql );
     $sth->execute( @args );
     while ( my ( $type, $count ) = $sth->fetchrow )
     {
@@ -77,6 +77,23 @@ sub _get_types
         push( @types, { val => $type, str => $type } );
     }
     return \@types;
+}
+
+sub _get_phases
+{
+    my $self = shift;
+    my ( $where, @args ) = $self->geo_where();
+    warn $where;
+    my @phases = ( { val => "all", str => "all" } );
+    my $sql = "SELECT PhaseOfEducation, COUNT(*) AS c FROM $from $where AND PhaseOfEducation IS NOT NULL GROUP BY PhaseOfEducation ORDER BY c DESC";
+    my $sth = $self->{dbh}->prepare( $sql );
+    $sth->execute( @args );
+    while ( my ( $phase, $count ) = $sth->fetchrow )
+    {
+        # push( @phases, { val => $phase, str => "$phase ($count)" } );
+        push( @phases, { val => $phase, str => $phase } );
+    }
+    return \@phases;
 }
 
 sub get_school_types
@@ -91,6 +108,20 @@ sub get_school_types
         push( @types, $type );
     }
     return \@types;
+}
+
+sub get_school_phases
+{
+    my $self = shift;
+    my @phases = ( "all" );
+    my $sql = "SELECT DISTINCT PhaseOfEducation FROM edubase";
+    my $sth = $self->{dbh}->prepare( $sql );
+    $sth->execute();
+    while ( my ( $phase ) = $sth->fetchrow )
+    {
+        push( @phases, $phase );
+    }
+    return \@phases;
 }
 
 sub get_order_bys
@@ -119,7 +150,6 @@ sub geo_where
     my @args;
     my @where = ( 
         "edubase.URN = dcsf.URN", 
-        "edubase.URN = ofsted.ofsted_id", 
     );
     if ( $self->{minLon} && $self->{maxLon} && $self->{minLat} && $self->{maxLat} )
     {
@@ -147,7 +177,6 @@ sub get_schools
     my @args;
     my @where = ( 
         "edubase.URN = dcsf.URN", 
-        "edubase.URN = ofsted.ofsted_id", 
     );
     if ( $self->{minLon} && $self->{maxLon} && $self->{minLat} && $self->{maxLat} )
     {
@@ -161,6 +190,11 @@ sub get_schools
             )
         );
         push( @args, $self->{minLon}, $self->{maxLon}, $self->{minLat}, $self->{maxLat} );
+    }
+    if ( my $phase = $self->{phase} )
+    {
+        push( @where, "edubase.PhaseOfEducation = ?" );
+        push( @args, $phase );
     }
     if ( my $type = $self->{type} )
     {

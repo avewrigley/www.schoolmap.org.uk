@@ -56,7 +56,7 @@ sub update_school
         $school{postcode} =~ s/^\s*//g;
         $school{postcode} =~ s/\s*$//g;
         $sc->create_school( 'ofsted', %school );
-        $rsth->execute( @school{qw(ofsted_id url type)} );
+        $rsth->execute( @school{qw(URN url type)} );
     };
     if ( $@ )
     {
@@ -90,8 +90,8 @@ if ( $opts{flush} )
     }
 }
 $sc = CreateSchool->new( dbh => $dbh );
-$ssth = $dbh->prepare( "SELECT * FROM ofsted WHERE ofsted_id = ? AND ofsted_url = ? AND type = ?" );
-$rsth = $dbh->prepare( "REPLACE INTO ofsted ( ofsted_id, ofsted_url, type ) VALUES ( ?, ?, ? )" );
+$ssth = $dbh->prepare( "SELECT * FROM ofsted WHERE URN = ? AND ofsted_url = ? AND type = ?" );
+$rsth = $dbh->prepare( "REPLACE INTO ofsted ( URN, ofsted_url, type ) VALUES ( ?, ?, ? )" );
 unless ( $opts{verbose} )
 {
     open( STDERR, ">$logfile" ) or die "can't write to $logfile\n";
@@ -102,11 +102,11 @@ if ( $opts{all} )
     if ( $opts{force} )
     {
         # $sql = "SELECT URN FROM school_list ORDER BY URN";
-        $sql = "SELECT ofsted_id FROM ofsted WHERE type = ? ORDER BY ofsted_id";
+        $sql = "SELECT URN FROM ofsted WHERE type = ? ORDER BY URN";
     }
     else
     {
-        $sql = "SELECT URN FROM school_list LEFT JOIN school ON school_list.URN = school.ofsted_id WHERE school.ofsted_id IS NULL ORDER BY URN";
+        $sql = "SELECT URN FROM school_list LEFT JOIN school ON school_list.URN = school.URN WHERE school.URN IS NULL ORDER BY URN";
     }
     my $sth = $dbh->prepare( $sql );
     for my $type ( keys %types )
@@ -115,14 +115,14 @@ if ( $opts{all} )
         while ( my ( $urn ) = $sth->fetchrow )
         {
             warn "$urn\n";
-            update_school( ofsted_id => $urn, url => "$root_url$urn" );
+            update_school( URN => $urn, url => "$root_url$urn" );
         }
     }
     exit;
 }
 if ( $opts{urn} )
 {
-    update_school( ofsted_id => $opts{urn}, url => "$root_url$opts{urn}" );
+    update_school( URN => $opts{urn}, url => "$root_url$opts{urn}" );
     exit;
 }
 my @types = $opts{type} ? ( $opts{type} ) : keys %types;
@@ -155,12 +155,12 @@ TYPE: for my $type ( @types )
             $i++;
             my $url = $link->url_abs;
             my %school = ( type => $type );
-            ( $school{ofsted_id} ) = $url =~ $url_regex;
+            ( $school{URN} ) = $url =~ $url_regex;
             $school{url} = $url;
             $school{name} = $link->text;
             warn "($i / $nreports) $type - $school{name}\n";
             next LINK if $opts{school} && $opts{school} ne $school{name};
-            $ssth->execute( @school{qw(ofsted_id url type)} );
+            $ssth->execute( @school{qw(URN url type)} );
             my $school = $ssth->fetchrow_hashref();
             if ( ! $opts{force} && $school )
             {
