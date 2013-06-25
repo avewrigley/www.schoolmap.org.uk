@@ -21,6 +21,7 @@ warn Dumper \%formdata;
 print "Content-Type: text/html\n\n";
 my $schools = Schools->new( %formdata );
 $formdata{types} = $schools->get_school_types;
+$formdata{phases} = $schools->get_school_phases;
 $formdata{order_bys} = $schools->get_order_bys;
 my $template_file = 'index.tt';
 $formdata{apikey} = $config->{apikey};
