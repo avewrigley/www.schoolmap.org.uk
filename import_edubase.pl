@@ -21,10 +21,12 @@ my @keys = qw(
     URN
     EstablishmentName
     PhaseOfEducation
-    HeadTitle
     NumberOfPupils
     Postcode
+    HeadTitle
+    HeadHonour
     HeadLastName
+    HeadFirstName
     WebsiteAddress
     TelephoneNum
     Easting
@@ -74,7 +76,7 @@ while ( my $row = $csv->getline( $fh ) )
 sub add_school
 {
     my $edubase = shift;
-    for my $k1 ( keys %$edubase )
+    for my $k1 ( sort keys %$edubase )
     {
         my $k2 = $k1;
         $k2 =~ s/ \(name\)//;
