@@ -3,6 +3,7 @@
         <title>[% school.name | html %]</title>
         <script type="text/javascript" src="/js/yui/build/yahoo/yahoo.js"></script>
         <script type="text/javascript" src="/js/yui/build/dom/dom.js"></script> 
+        <link rel="stylesheet" href="/css/schoolmap.css" type="text/css" media="screen" />
         <link type="text/css" rel="stylesheet" href="/css/navbar.css" /> 
     </head>
     <body>
@@ -33,6 +34,6 @@
         </div>
         <iframe style="border: 0" name="details" width="100%" height="100%" src="[% iframe_source %]"></iframe>
         <hr />
-        [% INCLUDE footer.tt %]
+        <div id="footer">[% INCLUDE "footer.tt" %]</div>
     </body>
 </html>

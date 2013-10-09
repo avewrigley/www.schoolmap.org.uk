@@ -618,7 +618,7 @@ SCHOOLMAP.createInfoWindow = function( school )
     var div = document.createElement( "DIV" );
     div.className = "infoWindow";
     var h2 = document.createElement( "H2" );
-    h2.appendChild( document.createTextNode( school.name ) );
+    h2.appendChild( document.createTextNode( school.EstablishmentName ) );
     div.appendChild( h2 );
     var p = document.createElement( "P" );
     var address = school.address.split( "," );
@@ -628,19 +628,20 @@ SCHOOLMAP.createInfoWindow = function( school )
         p.appendChild( document.createElement( "BR" ) );
     }
     div.appendChild( p );
-    if ( school.HEAD_LAST )
+    if ( school.HeadLastName )
     {
-        var head = school.HEAD_TITLE + " " + school.HEAD_FIRST + " " + school.HEAD_LAST;
+        var head = school.HeadTitle + " " + school.HeadFirstName + " " + school.HeadLastName;
         p = document.createElement( "P" );
         p.appendChild( 
             document.createTextNode( "Head: " + head )
         );
-        if ( school.HEAD_HONOUR )
+        if ( school.HeadHonour )
         {
             p.appendChild( document.createElement( "BR" ) );
-            p.appendChild( document.createTextNode( school.HEAD_HONOUR ) );
+            p.appendChild( document.createTextNode( school.HeadHonour ) );
         }
         div.appendChild( p );
+
     }
     return div;
 };

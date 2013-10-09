@@ -10,6 +10,51 @@
 use strict;
 use warnings;
 
+=head1 NAME
+
+dcfs.pl
+
+=head1 DESCRIPTION
+
+A script to crawl dcfs site for school info.
+
+=head1 SYNOPSIS
+
+    deliver.pl 
+        [--verbose] 
+        [--man] 
+        [--help] 
+        [--year <YYY-MM-DD>]
+        [--force]
+        [--flush]
+        [--silent]
+        [--pidfile </path/to/pidfile>]
+        [--school <school name>]
+        [--type <school type>]
+
+
+=head1 OPTIONS
+
+=over 4
+
+=item --verbose
+
+Output status messages to STDERR
+
+=item --man
+
+Output man page documentation
+
+=item --help
+
+Output help documentation
+
+=back
+
+=cut
+
+
+
 use FindBin qw( $Bin );
 use WWW::Mechanize;
 use LWP::UserAgent;
@@ -19,6 +64,10 @@ use Proc::Pidfile;
 use HTML::Entities;
 require HTML::TableExtract;
 use DBI;
+use Log::Any qw( $log );
+use Log::Dispatch::FileRotate;
+use Log::Dispatch::Screen;
+use Log::Any::Adapter;
 use lib "$Bin/lib";
 require CreateSchool;
 use URI::URL;
@@ -26,11 +75,8 @@ use Data::Dumper;
 
 use vars qw( %types @types );
 
-my $postcode_regex = qr{^([A-PR-UWYZ0-9][A-HK-Y0-9][AEHMNPRTVXY0-9]?[ABEHMNPRVWXY0-9]? {1,2}[0-9][ABD-HJLN-UW-Z]{2}|GIR 0AA)$}i;
-
 sub get_types
 {
-    my $year = shift;
     return (
         primary => {
             type_regex => qr/Primary/,
@@ -48,7 +94,7 @@ sub get_types
 }
 
 my %opts;
-my @opts = qw( year=s force flush region=s la=s school=s type=s force silent pidfile! verbose );
+my @opts = qw( year=s force flush school=s type=s force silent pidfile! verbose help man );
 
 my ( $dbh, $school_creator, %done );
 
@@ -68,14 +114,14 @@ sub update_school
     my $row = shift;
 
     my %school = ( name => $school_name );
-    warn $school_url;
+    $log->info( $school_url );
     $school{dcsf_id} = $school_id;
     my $mech = WWW::Mechanize->new();
     $mech->get( $school_url );
     my $html = $mech->content();
     unless ( $html )
     {
-        warn "failed to get $school_url\n";
+        $log->warning( "failed to get $school_url" );
         return;
     }
     my $te = HTML::TableExtract->new();
@@ -95,7 +141,7 @@ sub update_school
     $school{postcode} = $data{Postcode};
     $school{type} = $data{"School type"};
     $school{URN} = $data{"Unique Reference Number"};
-    warn Dumper \%school;
+    $log->debug( Dumper \%school );
     # SCHDATA={"code":125421,"x":-0.398859565522962,"y":51.3465648147044,"name":"ACS Cobham International School"};
     my ( $lat, $lon ) = $html =~ /SCHDATA={"code":\d+,"x":([-\d\.]+),"y":([-\d\.]+)/;
     if ( $lat && $lon )
@@ -116,14 +162,14 @@ sub update_school
             }
             else
             {
-                # warn "'$score' is not numeric\n";
+                $log->warning( "'$score' is not numeric" );
                 $score = undef;
             }
         }
     }
     else
     {
-        warn "no score index\n";
+        $log->warning( "no score index" );
     }
     return unless $score;
     my $select_sql = "SELECT dcsf_id FROM dcsf WHERE dcsf_id = ?";
@@ -154,40 +200,84 @@ $opts{pidfile} = 1;
 $opts{year} = ( localtime )[5];
 $opts{year} += 1900;
 GetOptions( \%opts, @opts ) or pod2usage( verbose => 0 );
+$opts{help} && pod2usage( verbose => 1 );
+$opts{man} && pod2usage( verbose => 2 );
+
+my $logfile = "/var/log/schoolmap/dcsf.log";
+
+my $dispatcher = Log::Dispatch->new(
+    callbacks  => sub {
+        my %args = @_;
+        my $message = $args{message};
+        return uc( $args{level} ) . ": " . scalar( localtime ) . ": $message";
+    }
+);
+
+Log::Any::Adapter->set( 'Dispatch', dispatcher => $dispatcher );
+
+if( $opts{verbose} )
+{
+    $dispatcher->add(
+        Log::Dispatch::Screen->new(
+            name        => 'screen',
+            newline     => 1,
+            min_level   => 'info',
+        )
+    );
+    $log->info( "logging to $logfile" );
+}
+else
+{
+    $dispatcher->add(
+        Log::Dispatch::Screen->new(
+            name        => 'screen',
+            newline     => 1,
+            min_level   => 'error',
+        )
+    );
+}
+
+$dispatcher->add(
+    my $file = Log::Dispatch::FileRotate->new( 
+        name            => 'logfile',
+        min_level       => 'info',
+        filename        => $logfile,
+        mode            => 'append' ,
+        DatePattern     => 'yyyy-MM-dd',
+        max             => 7,
+        newline         => 1,
+    ),
+);
+
 my $pp;
 if ( $opts{pidfile} )
 {
     $pp = Proc::Pidfile->new( silent => $opts{silent} );
 }
-my $logfile = "/var/log/schoolmap/dcsf.log";
 $dbh = DBI->connect( 'DBI:mysql:schoolmap', 'schoolmap', 'schoolmap', { RaiseError => 1, PrintError => 0 } );
 $school_creator = CreateSchool->new( dbh => $dbh );
-unless ( $opts{verbose} )
-{
-    open( STDERR, ">$logfile" ) or die "can't write to $logfile\n";
-}
-%types = get_types( $opts{year} );
+%types = get_types();
 @types = $opts{type} ? ( $opts{type} ) : keys %types;
 for my $type ( @types )
 {
-    die "unknown type $type\n" unless $types{$type};
-    warn "getting performance tables for $type\n";
+    $log->critical( "unknown type $type" ) and die unless $types{$type};
+    $log->info( "getting performance tables for $type" );
     my $mech = WWW::Mechanize->new();
     # $mech->get( 'http://www.dcsf.gov.uk/' );
     $mech->get( 'http://www.education.gov.uk/' );
     unless ( $mech->follow_link( text_regex => qr/performance tables/i ) )
     {
-        die "failed to find performance tables\n";
+        $log->critical( "failed to find performance tables" ) and die;
     }
-    warn "performance tables at ", $mech->uri(), "\n";
+    $log->info( "performance tables at " . $mech->uri() );
     my $type_regex = $types{$type}{type_regex};
-    warn "Trying $type_regex ...\n";
+    $log->info( "Trying $type_regex ..." );
     if ( ! $mech->follow_link( text_regex => $type_regex ) )
     {
-        warn "failed to find link matching $type_regex!\n";
+        $log->warning( "failed to find link matching $type_regex" );
         next;
     }
-    warn $mech->uri(), "\n";
+    $log->info( $mech->uri() );
     my $success = 1;
     my %url_seen = ();
     while ( $success )
@@ -196,7 +286,7 @@ for my $type ( @types )
         my $url = $mech->uri;
         if ( $url_seen{$url}++ )
         {
-            warn "$url already seen\n";
+            $log->info( "$url already seen" );
             last;
         }
         my $html = $mech->content();
@@ -214,19 +304,18 @@ for my $type ( @types )
                 next unless $school_name && $school_name =~ /\S/;
                 my $school_id = get_id( $school_url );
                 next unless $school_id;
-                warn "$school_url, $school_name, $school_id";
+                $log->info( "$school_url, $school_name, $school_id" );
                 $school_url = decode_entities( $school_url );
                 my $u1 = URI::URL->new( $school_url, $url );
                 $school_url = $u1->abs;
                 next if $opts{school} && $opts{school} ne $school_name;
-                # warn "$type\t$region_name\t$la_name\t$school_name ($school_url)\n";
-                warn "\t$school_name ($school_url)\n";
+                $log->info( "\t$school_name ($school_url)" );
                 eval {
                     update_school( $type, $school_name, $school_url, $school_id, $row );
                 };
                 if ( $@ )
                 {
-                    warn "$school_name FAILED: $@\n";
+                    $log->error( "$school_name FAILED: $@" );
                 }
                 else
                 {
@@ -237,13 +326,13 @@ for my $type ( @types )
         if ( $mech->follow_link( text_regex => qr/Next/ ) )
         {
             my $next_url = $mech->uri;
-            warn "Next page ($next_url) ...\n";
+            $log->info( "Next page ($next_url) ..." );
         }
         else
         {
-            warn "no next links\n";
+            $log->warning( "no next links" );
             last;
         }
     }
 }
-warn "$0 ($$) finished\n";
+$log->info( "$0 ($$) finished" );

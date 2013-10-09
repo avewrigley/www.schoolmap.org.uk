@@ -9,34 +9,68 @@ use FindBin qw( $Bin );
 use lib "$Bin/lib";
 require Schools;
 require Template;
-require Geo::Coder::Google;
+# require Geo::Coder::Google;
+require Google::GeoCoder::Smart;
 use Data::Dumper;
 use YAML qw( LoadFile );
+use Log::Any qw( $log );
+use Log::Dispatch::FileRotate;
+use Log::Dispatch::Screen;
+use Log::Any::Adapter;
 
+my $logfile = "/var/log/schoolmap/index.log";
+
+my $dispatcher = Log::Dispatch->new(
+    callbacks  => sub {
+        my %args = @_;
+        my $message = $args{message};
+        return uc( $args{level} ) . ": " . scalar( localtime ) . ": $message";
+    }
+);
+
+Log::Any::Adapter->set( 'Dispatch', dispatcher => $dispatcher );
+
+$dispatcher->add(
+    my $file = Log::Dispatch::FileRotate->new(
+        name            => 'logfile',
+        min_level       => 'debug',
+        filename        => $logfile,
+        mode            => 'append' ,
+        DatePattern     => 'yyyy-MM-dd',
+        max             => 7,
+        newline         => 1,
+    ),
+);
+
+$log->debug( "start" );
 my $config = LoadFile( "$Bin/google.yaml" );
-open( STDERR, ">>$Bin/logs/index.log" );
-warn "$$ at ", scalar( localtime ), "\n";
 my %formdata = CGI::Lite->new->parse_form_data();
-warn Dumper \%formdata;
+$log->debug( "form data: " . Dumper \%formdata );
 print "Content-Type: text/html\n\n";
-my $schools = Schools->new( %formdata );
+my $schools = eval { Schools->new( %formdata ) };
+$log->critical( $@ ) if $@;
 $formdata{types} = $schools->get_school_types;
 $formdata{phases} = $schools->get_school_phases;
 $formdata{order_bys} = $schools->get_order_bys;
 my $template_file = 'index.tt';
 $formdata{apikey} = $config->{apikey};
+$formdata{title} = "UK Schools Map";
 if ( $formdata{address} )
 {
-    my $geocoder = Geo::Coder::Google->new(
-        apikey => $config->{apikey},
-        host => "maps.google.co.uk",
-    );
-    warn "lookup $formdata{address}\n";
-    my $location = $geocoder->geocode( location => $formdata{address} );
-    warn Dumper $location;
-    $formdata{location} = $location;
+    my $geo = eval { Google::GeoCoder::Smart->new() };
+    $log->critical( $@ ) if $@;
+    $log->info( "lookup $formdata{address}" );
+    my ( $resultnum, $error, @results, $returncontent ) = $geo->geocode( "address" => $formdata{address} );
+    $log->info( "$resultnum results" );
+    if ( $resultnum )
+    {
+        $formdata{title} = "UK Schools Map - $results[0]->{formatted_address}";
+        my $location = $results[0]->{geometry}{location};
+        $log->debug( Dumper( $results[0] ) );
+        $formdata{location} = $location;
+    }
 }
+$log->info( $formdata{address} );
 my $template = Template->new( INCLUDE_PATH => "$Bin/templates" );
-$template->process( $template_file, \%formdata )
-    || die $template->error()
+$template->process( $template_file, \%formdata ) || $log->critical( $template->error() )
 ;
