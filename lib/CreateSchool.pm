@@ -82,46 +82,6 @@ sub get_location
     die "no lat / lon\n";
 }
 
-sub create_school
-{
-    my $self = shift;
-    my $type = shift;
-    die "no type" unless $type;
-    my %school = @_;
-
-    die "no name" unless $school{name};
-    die "no postcode" unless $school{postcode};
-    my $postcode = $school{postcode};
-    my $id_key = $type . "_id";
-    die "no $id_key" unless $school{$id_key};
-    $school{postcode} = uc( $school{postcode} );
-    $school{postcode} =~ s/[^0-9A-Z]//g;
-    # warn "lookup @school{qw(postcode name)} ...\n";
-    my $ssth = $self->{dbh}->prepare( "SELECT * FROM school WHERE postcode = ? AND name = ?" );
-    $ssth->execute( @school{qw(postcode name)} );
-    my $school = $ssth->fetchrow_hashref();
-    if ( $school )
-    {
-        # warn "UPDATE $school->{name}\n";
-        my $usth = $self->{dbh}->prepare( "UPDATE school SET ${type}_id = ? WHERE postcode = ? AND name = ?" );
-        $usth->execute( @school{$id_key, qw(postcode name)} );
-        return;
-    }
-    warn "new school: $school{name}\n";
-    if ( $school{lat} && $school{lon} )
-    {
-        $self->{geopostcode}->add( $school{postcode}, $school{lat}, $school{lon} );
-    }
-    else
-    {
-        ( $school{lon}, $school{lat} ) = $self->get_location( \%school, using => [ "google" ] );
-    }
-    my $isth = $self->{dbh}->prepare( <<SQL );
-REPLACE INTO school ( $id_key, name, postcode, address ) VALUES ( ?,?,?,? )
-SQL
-    $isth->execute( @school{$id_key, qw( name postcode address )} );
-}
-
 sub new
 {
     my $class = shift;
