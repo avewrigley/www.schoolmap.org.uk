@@ -29,6 +29,11 @@
     padding: 10px;
 }
 
+#adsense {
+    padding-top: 20px;
+    width: 50%; margin: 0 auto;
+}
+
 #footer * {
     font-size: 10px;
 }
