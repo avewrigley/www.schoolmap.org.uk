@@ -44,6 +44,7 @@ $dispatcher->add(
 
 $log->debug( "start" );
 my $config = LoadFile( "$Bin/google.yaml" );
+$log->debug( "config: " . Dumper $config );
 my %formdata = CGI::Lite->new->parse_form_data();
 $log->debug( "form data: " . Dumper \%formdata );
 print "Content-Type: text/html\n\n";
@@ -53,7 +54,7 @@ $formdata{types} = $schools->get_school_types;
 $formdata{phases} = $schools->get_school_phases;
 $formdata{order_bys} = $schools->get_order_bys;
 my $template_file = 'index.tt';
-$formdata{apikey} = $config->{apikey};
+$formdata{$_} = $config->{$_} for keys %$config;
 $formdata{title} = "UK Schools Map";
 if ( $formdata{address} )
 {
