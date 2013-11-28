@@ -57,7 +57,7 @@ Output help documentation
 
 use FindBin qw( $Bin );
 use WWW::Mechanize;
-use LWP::UserAgent;
+use LWP::Simple;
 use Pod::Usage;
 use Getopt::Long;
 use Proc::Pidfile;
@@ -74,6 +74,7 @@ use URI::URL;
 use Data::Dumper;
 
 use vars qw( %types @types );
+my $ofsted_base_url = "http://www.ofsted.gov.uk/inspection-reports/find-inspection-report/provider/ELS/";
 
 sub get_types
 {
@@ -96,7 +97,7 @@ sub get_types
 my %opts;
 my @opts = qw( year=s force flush school=s type=s force silent pidfile! verbose help man );
 
-my ( $dbh, $school_creator, %done );
+my ( $dbh, %done );
 
 sub get_id
 {
@@ -141,6 +142,17 @@ sub update_school
     $school{postcode} = $data{Postcode};
     $school{type} = $data{"School type"};
     $school{URN} = $data{"Unique Reference Number"};
+    my $ofsted_url = "$ofsted_base_url/$school{URN}";
+    my $content = get( $ofsted_url );
+    if ( $content )
+    {
+        $log->info( $ofsted_url );
+        if ( $content =~ m{<span class="ins-judgement[^"]*">(.*?)</span>} )
+        {
+            $school{OfstedStatus} = $1;
+            $log->info( "OfstedStatus: $school{OfstedStatus}" );
+        }
+    }
     $log->debug( Dumper \%school );
     # SCHDATA={"code":125421,"x":-0.398859565522962,"y":51.3465648147044,"name":"ACS Cobham International School"};
     my ( $lat, $lon ) = $html =~ /SCHDATA={"code":\d+,"x":([-\d\.]+),"y":([-\d\.]+)/;
@@ -148,7 +160,6 @@ sub update_school
     {
         $school{lat} = $lat, $school{lon} = $lon;
     }
-    $school_creator->create_school( 'dcsf', %school );
     my $score;
     if ( my $i = $types{$type}{score_index} )
     {
@@ -178,18 +189,18 @@ sub update_school
     if ( $select_sth->fetchrow )
     {
         my $update_sql = <<EOF;
-UPDATE dcsf SET URN = ?, type = ?, school_type = ?, dcsf_url = ?, average_${type} = ? WHERE dcsf_id = ?
+UPDATE dcsf SET URN = ?, type = ?, school_type = ?, dcsf_url = ?, average_${type} = ?, ofstedstatus = ? WHERE dcsf_id = ?
 EOF
         my $update_sth = $dbh->prepare( $update_sql );
-        $update_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $school{dcsf_id} );
+        $update_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $school{OfstedStatus}, $school{dcsf_id} );
     }
     else
     {
         my $insert_sql = <<EOF;
-INSERT INTO dcsf (URN,type,school_type,dcsf_url,average_${type},dcsf_id) VALUES(?,?,?,?,?,?)
+INSERT INTO dcsf (URN,type,school_type,dcsf_url,average_${type},ofstedstatus,dcsf_id) VALUES(?,?,?,?,?,?)
 EOF
         my $insert_sth = $dbh->prepare( $insert_sql );
-        $insert_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $school{dcsf_id} );
+        $insert_sth->execute( $school{URN}, $type, $school{type}, $school_url, $score, $school{OfstedStatus}, $school{dcsf_id} );
     }
     $done{$school{dcsf_id}} = $school_name;
 }
@@ -255,7 +266,6 @@ if ( $opts{pidfile} )
     $pp = Proc::Pidfile->new( silent => $opts{silent} );
 }
 $dbh = DBI->connect( 'DBI:mysql:schoolmap', 'schoolmap', 'schoolmap', { RaiseError => 1, PrintError => 0 } );
-$school_creator = CreateSchool->new( dbh => $dbh );
 %types = get_types();
 @types = $opts{type} ? ( $opts{type} ) : keys %types;
 for my $type ( @types )
