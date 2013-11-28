@@ -1,6 +1,6 @@
 var SCHOOLMAP = {
     default_zoom:12,
-    default_center:new GLatLng( 53.82659674299412, -1.86767578125 ),
+    default_center:new google.maps.LatLng( 53.82659674299412, -1.86767578125 ),
     schools_url:"schools",
     school_url:"school",
     schools:[],
@@ -25,22 +25,17 @@ var SCHOOLMAP = {
     },
     handle_zoom:false,
     handle_move:false,
-    layer_config:{
-        panoramio: "com.panoramio.all",
-        wikipedia: "org.wikipedia.en"
-    },
-    layers:{},
     addressMarker:false
 };
 
 SCHOOLMAP.setMapListeners = function() 
 {
-    SCHOOLMAP.handle_zoom = GEvent.addListener( 
+    SCHOOLMAP.handle_zoom = google.maps.event.addListener( 
         SCHOOLMAP.map, 
         "zoomend", 
         function() { SCHOOLMAP.getSchools(); }
     );
-    SCHOOLMAP.handle_move = GEvent.addListener( 
+    SCHOOLMAP.handle_move = google.maps.event.addListener( 
         SCHOOLMAP.map, 
         "moveend", 
         function() {
@@ -52,52 +47,41 @@ SCHOOLMAP.setMapListeners = function()
 SCHOOLMAP.removeMapListeners = function() {
     if ( SCHOOLMAP.handle_zoom )
     {
-        GEvent.removeListener( SCHOOLMAP.handle_zoom );
+        google.maps.event.removeListener( SCHOOLMAP.handle_zoom );
         SCHOOLMAP.handle_zoom = false;
     }
     if ( SCHOOLMAP.handle_move )
     {
-        GEvent.removeListener( SCHOOLMAP.handle_move );
+        google.maps.event.removeListener( SCHOOLMAP.handle_move );
         SCHOOLMAP.handle_move = false;
     }
 }
 
-SCHOOLMAP.place2point = function( a ) 
-{
-    return new GLatLng( a.Point.coordinates[1], a.Point.coordinates[0] );
-};
-
-SCHOOLMAP.createAddressIcon = function() 
-{
-    var myIcon = new GIcon();
-    myIcon.image = '/markers/image.png';
-    myIcon.shadow = '/markers/shadow.png';
-    myIcon.iconSize = new GSize(32,37);
-    myIcon.shadowSize = new GSize(51,37);
-    myIcon.iconAnchor = new GPoint(16,37);
-    myIcon.infoWindowAnchor = new GPoint(16,0);
-    myIcon.printImage = '/markers/printImage.gif';
-    myIcon.mozPrintImage = '/markers/mozPrintImage.gif';
-    myIcon.printShadow = '/markers/printShadow.gif';
-    myIcon.transparent = '/markers/transparent.png';
-    myIcon.imageMap = [29,0,30,1,31,2,31,3,31,4,31,5,31,6,31,7,31,8,31,9,31,10,31,11,31,12,31,13,31,14,31,15,31,16,31,17,31,18,31,19,31,20,31,21,31,22,31,23,31,24,31,25,31,26,31,27,31,28,31,29,30,30,29,31,23,32,22,33,21,34,20,35,19,36,12,36,11,35,10,34,9,33,8,32,2,31,1,30,0,29,0,28,0,27,0,26,0,25,0,24,0,23,0,22,0,21,0,20,0,19,0,18,0,17,0,16,0,15,0,14,0,13,0,12,0,11,0,10,0,9,0,8,0,7,0,6,0,5,0,4,0,3,0,2,1,1,2,0];
-    return myIcon;
-}
-
 SCHOOLMAP.createAddressMarker = function() 
 {
+    console.log( "createAddressMarker" );
+    console.log( SCHOOLMAP.place );
     if ( ! SCHOOLMAP.place ) return;
+    var latlng = SCHOOLMAP.place.geometry.location;
+    console.log( latlng );
     if ( SCHOOLMAP.addressMarker ) return;
-    SCHOOLMAP.addressMarker = new GMarker( 
-        SCHOOLMAP.place.point, 
-        { draggable: true, icon:SCHOOLMAP.createAddressIcon() } 
+    SCHOOLMAP.addressMarker = new google.maps.Marker( 
+        { 
+            "position": latlng,
+            "draggable": true,
+            "icon": { url: "/markers/image.png" },
+            "map": SCHOOLMAP.map
+        } 
     );
-    GEvent.addListener( 
+    console.log( SCHOOLMAP.addressMarker );
+    google.maps.event.addListener( 
         SCHOOLMAP.addressMarker, 
         "dragend", 
-        function( latlng ) { 
+        function( e ) { 
+            console.log( e );
+            console.log( e.latLng );
             SCHOOLMAP.findAddress( 
-                latlng.lat() + "," + latlng.lng(),
+                e.latLng.lat() + "," + e.latLng.lng(),
                 function( point ) {
                     SCHOOLMAP.resetDistances();
                     SCHOOLMAP.updateSchools();
@@ -105,34 +89,37 @@ SCHOOLMAP.createAddressMarker = function()
             );
         }
     );
-    SCHOOLMAP.map.addOverlay( SCHOOLMAP.addressMarker );
 };
 
 SCHOOLMAP.removeSchoolMarkers = function() 
 {
     var listDiv = document.getElementById( "list" );
     SCHOOLMAP.removeChildren( listDiv );
-    SCHOOLMAP.mgr.clearMarkers();
+    for ( var i = 0; i < SCHOOLMAP.schools.length; i++ )
+    {
+        var school = SCHOOLMAP.schools[i];
+        school.markers.setMap( null );
+    }
 };
 
 SCHOOLMAP.findAddress = function( query, callback ) 
 {
-    SCHOOLMAP.geocoder.getLocations( 
-        query, 
-        function ( response ) {
-            if ( ! response || response.Status.code != 200 ) 
+    SCHOOLMAP.geocoder.geocode( 
+        { "address": query }, 
+        function ( results, status ) {
+            if ( ! google.maps.GeocoderStatus.OK )
             {
                 alert("\"" + query + "\" not found");
                 return;
             }
-            SCHOOLMAP.place = response.Placemark[0];
-            var point = SCHOOLMAP.place.point = SCHOOLMAP.place2point( SCHOOLMAP.place );
+            var result = results[0];
+            SCHOOLMAP.place = result;
             SCHOOLMAP.createAddressMarker();
             var input = document.getElementById( "address" );
-            input.value = SCHOOLMAP.place.address;
+            input.value = SCHOOLMAP.place.formatted_address;
             var span = document.getElementById( "coords" );
-            SCHOOLMAP.setText( span, "( lat: " + SCHOOLMAP.place.point.lat() + ", lng: " + SCHOOLMAP.place.point.lng() + ")" );
-            if ( callback ) callback( point );
+            SCHOOLMAP.setText( span, "( lat: " + SCHOOLMAP.place.geometry.location.lat() + ", lng: " + SCHOOLMAP.place.geometry.location.lng() + ")" );
+            if ( callback ) callback( SCHOOLMAP.place.geometry.location );
         }
     );
 };
@@ -286,11 +273,8 @@ SCHOOLMAP.getSchools = function()
 
 SCHOOLMAP.typesCallback = function( response ) 
 {
-    console.log( response )
     var types = JSON.parse( response.responseText );
     var sel = document.forms[0].type;
-    console.log( document.forms[0] );
-    console.log( sel );
     if ( sel )
     {
         var val = sel.value;
@@ -336,22 +320,14 @@ SCHOOLMAP.getSchoolsCallback = function( response )
 SCHOOLMAP.updateSchools = function()
 {
     var order_by = document.forms[0].order_by.value;
-    if ( order_by == "distance" )
-    {
-        SCHOOLMAP.calculateAllDistances( SCHOOLMAP.redrawSchools );
-    }
-    else
-    {
-        SCHOOLMAP.redrawSchools( SCHOOLMAP.calculateAllDistances );
-    }
+    SCHOOLMAP.calculateAllDistances( 0 );
 };
 
-SCHOOLMAP.redrawSchools = function( callback ) 
+SCHOOLMAP.redrawSchools = function( ) 
 {
     try {
         var body = document.getElementsByTagName( "body" );
         body[0].style.cursor = "auto";
-        var markers = [];
         for ( var i = 0; i < SCHOOLMAP.schools.length; i++ )
         {
             var school = SCHOOLMAP.schools[i];
@@ -363,23 +339,17 @@ SCHOOLMAP.redrawSchools = function( callback )
                 phase = SCHOOLMAP.default_phase;
             }
             var colour = phase.colour;
-            var icon = SCHOOLMAP.createIcon( colour, school.no );
+            var symbol = SCHOOLMAP.getSymbol( colour );
             if ( school.marker )
             {
-                school.marker.setImage( icon.image );
+                school.marker.setIcon( symbol );
             }
             else
             {
-                var marker = SCHOOLMAP.createMarker( school, icon );
-                markers.push( marker );
+                SCHOOLMAP.createMarker( school, symbol );
             }
         }
-        if ( markers.length )
-        {
-            SCHOOLMAP.mgr.addMarkers( markers, 0, 17 );
-            SCHOOLMAP.mgr.refresh();
-        }
-        SCHOOLMAP.updateList( callback );
+        SCHOOLMAP.updateList( );
     } catch( e ) { console.error( e.message ) }
 };
 
@@ -393,13 +363,12 @@ SCHOOLMAP.typeOnChange = function()
     SCHOOLMAP.getSchools();
 };
 
-SCHOOLMAP.updateList = function( callback )
+SCHOOLMAP.updateList = function( )
 {
         var listDiv = document.getElementById( "list" );
         SCHOOLMAP.removeChildren( listDiv );
         if ( SCHOOLMAP.schools.length )
             listDiv.appendChild( SCHOOLMAP.createListTable() );
-        if ( callback ) callback();
 };
 
 SCHOOLMAP.activateSchool = function( school )
@@ -412,19 +381,6 @@ SCHOOLMAP.activateSchool = function( school )
     }
     SCHOOLMAP.changeMarkerColour( school, phase.active_colour )
     if ( SCHOOLMAP.active_school ) SCHOOLMAP.deActivateSchool( SCHOOLMAP.active_school );
-    if ( 0 && ! SCHOOLMAP.calculatingDistances )
-    {
-        SCHOOLMAP.setDistanceListeners( 
-            function( meters ) {
-                var m = SCHOOLMAP.convertMeters( meters );
-                window.status = "distance to " + school.name + " = " + m;
-            }
-        );
-        SCHOOLMAP.gdir.load( 
-            school.directions_text,
-            { preserveViewport:true, travelMode:"walking" }
-        );
-    }
     SCHOOLMAP.active_school = school;
     window.status = school.name;
 }
@@ -439,7 +395,6 @@ SCHOOLMAP.deActivateSchool = function( school )
         phase = SCHOOLMAP.default_phase;
     }
     SCHOOLMAP.changeMarkerColour( school, phase.colour );
-    if ( ! SCHOOLMAP.calculatingDistances ) SCHOOLMAP.gdir.clear();
     SCHOOLMAP.active_school = false;
 }
 
@@ -451,7 +406,7 @@ SCHOOLMAP.setParams = function()
     }
     if ( SCHOOLMAP.params.centerLng && SCHOOLMAP.params.centerLat )
     {
-        SCHOOLMAP.params.center = new GLatLng( SCHOOLMAP.params.centerLat, SCHOOLMAP.params.centerLng );
+        SCHOOLMAP.params.center = new google.maps.LatLng( SCHOOLMAP.params.centerLat, SCHOOLMAP.params.centerLng );
     }
     if (
         ! SCHOOLMAP.params.zoom &&
@@ -461,9 +416,9 @@ SCHOOLMAP.setParams = function()
         SCHOOLMAP.params.maxLat
     )
     {
-        var sw = new GLatLng( SCHOOLMAP.params.minLon, SCHOOLMAP.params.minLat );
-        var ne = new GLatLng( SCHOOLMAP.params.maxLon, SCHOOLMAP.params.maxLat );
-        var bounds = new GLatLngBounds( sw, ne );
+        var sw = new google.maps.LatLng( SCHOOLMAP.params.minLon, SCHOOLMAP.params.minLat );
+        var ne = new google.maps.LatLng( SCHOOLMAP.params.maxLon, SCHOOLMAP.params.maxLat );
+        var bounds = new google.maps.LatLngBounds( sw, ne );
         SCHOOLMAP.params.zoom = SCHOOLMAP.map.getBoundsZoomLevel( bounds );
     }
 };
@@ -491,52 +446,32 @@ SCHOOLMAP.resetDistances = function()
 {
     for ( var i = 0; i < SCHOOLMAP.schools.length; i++ )
     {
-        SCHOOLMAP.schools[i].meters = 0;
+        SCHOOLMAP.schools[i].meters = "";
     }
 };
 
-SCHOOLMAP.calculateAllDistances = function( callback ) 
+SCHOOLMAP.calculateAllDistances = function( index )
 {
-    SCHOOLMAP.calculatingDistances = true;
-    for ( var i = 0; i < SCHOOLMAP.schools.length; i++ )
+    console.log( "SCHOOLMAP.calculateAllDistances: " + index );
+    if ( index === SCHOOLMAP.schools.length )
     {
-        if ( ! SCHOOLMAP.schools[i].meters ) 
+        var order_by = document.forms[0].order_by.value;
+        if ( order_by == "distance" )
         {
-            SCHOOLMAP.calculateDistance( 
-                SCHOOLMAP.schools[i], 
-                function() { SCHOOLMAP.calculateAllDistances( callback ) }
-            );
-            return;
+            SCHOOLMAP.schools = SCHOOLMAP.schools.sort( SCHOOLMAP.sortByDistance );
         }
+        console.log( "SCHOOLMAP.redrawSchools" );
+        SCHOOLMAP.redrawSchools();
+        return;
     }
-    SCHOOLMAP.gdir.clear();
-    var order_by = document.forms[0].order_by.value;
-    if ( order_by == "distance" )
-    {
-        SCHOOLMAP.schools = SCHOOLMAP.schools.sort( SCHOOLMAP.sortByDistance );
-    }
-    SCHOOLMAP.calculatingDistances = false;
-    if ( callback ) callback();
+    var school = SCHOOLMAP.schools[index];
+    SCHOOLMAP.calculateDistance( school, function() { SCHOOLMAP.calculateAllDistances( index+1 ) } );
 }
 
 SCHOOLMAP.setText = function( e, t ) 
 {
     SCHOOLMAP.removeChildren( e );
     e.appendChild( document.createTextNode( t ) );
-};
-
-SCHOOLMAP.removeDistanceListeners = function( ) 
-{
-    if ( SCHOOLMAP.handle_error )
-    {
-        GEvent.removeListener( SCHOOLMAP.handle_error );
-        SCHOOLMAP.handle_error = false;
-    }
-    if ( SCHOOLMAP.handle_load )
-    {
-        GEvent.removeListener( SCHOOLMAP.handle_load );
-        SCHOOLMAP.handle_load = false;
-    }
 };
 
 SCHOOLMAP.convertMeters = function( m ) 
@@ -546,71 +481,54 @@ SCHOOLMAP.convertMeters = function( m )
     return km + " km";
 }
 
-SCHOOLMAP.setDistanceListeners = function( successcallback, allcallback ) 
-{
-    SCHOOLMAP.handle_load = GEvent.addListener(
-        SCHOOLMAP.gdir, 
-        "load", 
-        function( obj ) {
-            try {
-                var nroutes = obj.getNumRoutes();
-                if ( nroutes >= 0 )
-                {
-                    var route = obj.getRoute( 0 );
-                    var distance = route.getDistance();
-                    if ( typeof( distance.meters ) == "number" )
-                    {
-                        successcallback( distance.meters );
-                    }
-                }
-            } catch( e ) {
-                console.error( "route calculation failed: " + e.message );
-            }
-            SCHOOLMAP.removeDistanceListeners();
-            if ( allcallback ) allcallback();
-        }
-    );
-    SCHOOLMAP.handle_error = GEvent.addListener( 
-        SCHOOLMAP.gdir, 
-        "error", 
-        function( obj ) {
-            console.error( "error: " + obj.getStatus().code );
-            SCHOOLMAP.removeDistanceListeners();
-            // SCHOOLMAP.gdir.clear();
-            if ( allcallback ) allcallback();
-        }
-    );
-};
-
 SCHOOLMAP.calculateDistance = function( school, callback ) 
 {
     if ( ! SCHOOLMAP.place ) return;
     var from = school.lat + "," + school.lon;
-    var point = SCHOOLMAP.place.point;
+    var point = SCHOOLMAP.place.geometry.location;
     var to = point.lat() + "," + point.lng();
-    // var to = SCHOOLMAP.place.address;
     school.directions_text = "from " + from + " to " + to;
-    try {
-        SCHOOLMAP.setDistanceListeners( 
-            function( meters ) {
-                school.meters = meters;
-                if ( school.distance_td ) 
+    console.log( "calculate distance" );
+    var req = {
+        "origin": from,
+        "destination": to,
+        "travelMode": google.maps.TravelMode.WALKING,
+        "unitSystem": google.maps.UnitSystem.METRIC
+    };
+    SCHOOLMAP.gdir.route( 
+        req,
+        function( result, status ) {
+            var meters = "";
+            console.log( result );
+            if ( status == google.maps.DirectionsStatus.OK ) 
+            {
+                if ( result.routes && result.routes[0] )
                 {
-                    var m = SCHOOLMAP.convertMeters( school.meters );
-                    SCHOOLMAP.removeChildren( school.distance_td );
-                    school.distance_td.appendChild( document.createTextNode( m ) );
+                    var route = result.routes[0];
+                    for ( var i = 0; i < route.legs.length; i++ )
+                    {
+                        var leg = route.legs[0];
+                        console.log( leg );
+                        console.log( leg.distance );
+                        meters = meters + leg.distance.value;
+                    }
+                    console.log( meters );
                 }
-            },
-            callback 
-        );
-        SCHOOLMAP.gdir.load( 
-            school.directions_text,
-            { preserveViewport:true, travelMode:"walking" }
-        );
-    } catch( e ) {
-        console.error( e.message );
-        return;
-    }
+            }
+            else
+            {
+                console.error( "directions failed" );
+            }
+            school.meters = meters;
+            if ( school.distance_td ) 
+            {
+                SCHOOLMAP.removeChildren( school.distance_td );
+                var text = SCHOOLMAP.convertMeters( school.meters );
+                school.distance_td.appendChild( document.createTextNode( text ) );
+            }
+            if ( callback ) callback();
+        }
+    );
 };
 
 SCHOOLMAP.createInfoWindow = function( school )
@@ -646,24 +564,14 @@ SCHOOLMAP.createInfoWindow = function( school )
     return div;
 };
 
-SCHOOLMAP.createIcon = function( colour, no )
-{
-    var icon = MapIconMaker.createLabeledMarkerIcon(
-        { primaryColor: "#" + colour, label: "" + no }
-    );
-    icon.colour = colour;
-    return icon;
-};
-
-SCHOOLMAP.createMarker = function( school, icon ) {
+SCHOOLMAP.createMarker = function( school, symbol ) {
     try {
-        var point = new GLatLng( school.lat, school.lon );
-        var marker = new GMarker( point, { "icon":icon } );
-        // SCHOOLMAP.map.addOverlay( marker );
-        GEvent.addListener( marker, "mouseout", function() { SCHOOLMAP.deActivateSchool( school ) } );
-        GEvent.addListener( marker, "mouseover", function() { SCHOOLMAP.activateSchool( school ) } );
-        GEvent.addListener( 
-            marker, 
+        var point = new google.maps.LatLng( school.lat, school.lon );
+        school.marker = new google.maps.Marker( { "position": point, "map": SCHOOLMAP.map, "icon": symbol } );
+        google.maps.event.addListener( school.marker, "mouseout", function() { SCHOOLMAP.deActivateSchool( school ) } );
+        google.maps.event.addListener( school.marker, "mouseover", function() { SCHOOLMAP.activateSchool( school ) } );
+        google.maps.event.addListener( 
+            school.marker, 
             "infowindowclose", 
             function() {
                 if ( SCHOOLMAP.current_center )
@@ -673,24 +581,22 @@ SCHOOLMAP.createMarker = function( school, icon ) {
                 SCHOOLMAP.setMapListeners();
             }
         );
-        GEvent.addListener( 
-            marker, 
+        google.maps.event.addListener( 
+            school.marker, 
             "infowindowopen", 
             function() {
                 SCHOOLMAP.removeMapListeners();
             }
         );
-        GEvent.addListener( 
-            marker, 
+        google.maps.event.addListener( 
+            school.marker, 
             "click", 
             function() {
                 if ( ! SCHOOLMAP.current_center ) SCHOOLMAP.current_center = SCHOOLMAP.map.getCenter();
             } 
         );
-        var div = SCHOOLMAP.createInfoWindow( school );
-        marker.bindInfoWindow( div );
-        school.marker = marker;
-        return marker;
+        // var div = SCHOOLMAP.createInfoWindow( school );
+        // school.marker.bindInfoWindow( div );
     }
     catch(e) { console.error( e.message ) }
 }
@@ -702,6 +608,7 @@ SCHOOLMAP.initTableHead = function( tr, result_types )
     SCHOOLMAP.createHeadCell( tr, "name", "Name of school", 1 );
     SCHOOLMAP.createHeadCell( tr, "phase", "School stage" );
     SCHOOLMAP.createHeadCell( tr, "type", "Type of school" );
+    SCHOOLMAP.createHeadCell( tr, "ofsted", "Ofsted overall effectiveness" );
     for ( var i = 0; i < result_types.length; i++ )
     {
         var result_type = result_types[i];
@@ -710,7 +617,7 @@ SCHOOLMAP.initTableHead = function( tr, result_types )
     }
     if ( SCHOOLMAP.place )
     {
-        SCHOOLMAP.createHeadCell( tr, "distance", "Distance from " + SCHOOLMAP.place.address );
+        SCHOOLMAP.createHeadCell( tr, "distance", "Distance from " + SCHOOLMAP.place.formatted_address );
     }
 };
 
@@ -737,23 +644,12 @@ SCHOOLMAP.ignoreConsoleErrors = function() {
     }
 }
 
-SCHOOLMAP.toggleLayer = function( i ) 
-{
-    if ( i.checked ) SCHOOLMAP.layers[i.name].show();
-    else SCHOOLMAP.layers[i.name].hide();
-}
-
 SCHOOLMAP.initMap = function() 
 {
     // $('input#address').autoResize();
     SCHOOLMAP.ignoreConsoleErrors();
     SCHOOLMAP.getQueryVariables();
     SCHOOLMAP.setParams();
-    if ( ! GBrowserIsCompatible() )
-    {
-        console.log( "google maps not supported" );
-        return;
-    }
     var mapOptions = { 
         googleBarOptions : { 
             style : "new",
@@ -766,23 +662,18 @@ SCHOOLMAP.initMap = function()
         }
     };
     var map_div = document.getElementById( "map", mapOptions );
-    SCHOOLMAP.map = new GMap2( map_div );
-    SCHOOLMAP.map.setUIToDefault();
+    SCHOOLMAP.map = new google.maps.Map( map_div );
+    // SCHOOLMAP.map.setUIToDefault();
     // SCHOOLMAP.map.enableGoogleBar();
-    SCHOOLMAP.map.disableScrollWheelZoom();
-    SCHOOLMAP.map.addControl( new GMapTypeControl() );
-    SCHOOLMAP.map.addMapType( G_SATELLITE_3D_MAP );
-    SCHOOLMAP.map.addMapType( G_PHYSICAL_MAP );
+    // SCHOOLMAP.map.disableScrollWheelZoom();
 
-    SCHOOLMAP.addLayerControls();
     var center = SCHOOLMAP.params.center || SCHOOLMAP.default_center;
     var zoom = parseInt( SCHOOLMAP.params.zoom ) || SCHOOLMAP.default_zoom;
     SCHOOLMAP.map.setCenter( center, zoom );
-    SCHOOLMAP.mgr = new MarkerManager( SCHOOLMAP.map );
-    SCHOOLMAP.gdir = new GDirections( SCHOOLMAP.map );
-    SCHOOLMAP.geocoder = new GClientGeocoder();
-    SCHOOLMAP.geocoder.setBaseCountryCode( "uk" );
-    GEvent.addListener( 
+    SCHOOLMAP.gdir = new google.maps.DirectionsService();
+    SCHOOLMAP.geocoder = new google.maps.Geocoder();
+    // SCHOOLMAP.geocoder.setBaseCountryCode( "uk" );
+    google.maps.event.addListener( 
         SCHOOLMAP.map, 
         "moveend", 
         function() {
@@ -793,7 +684,7 @@ SCHOOLMAP.initMap = function()
             centerLng.value = center.lng();
         }
     );
-    GEvent.addListener( 
+    google.maps.event.addListener( 
         SCHOOLMAP.map, 
         "zoomend", 
         function() {
@@ -813,7 +704,7 @@ SCHOOLMAP.initMap = function()
                 SCHOOLMAP.map.setZoom( zoom );
                 var query_string = SCHOOLMAP.getQueryString();
                 var types_url = SCHOOLMAP.schools_url + "?" + query_string + "&types";
-                console.log( types_url );
+                // console.log( types_url );
                 SCHOOLMAP.get( types_url, SCHOOLMAP.typesCallback );
                 SCHOOLMAP.setMapListeners();
                 SCHOOLMAP.getSchools();
@@ -826,26 +717,6 @@ SCHOOLMAP.initMap = function()
     }
 };
 
-SCHOOLMAP.addLayerControls = function() 
-{
-    var div = document.getElementById( "layers" );
-    for ( var type in SCHOOLMAP.layer_config )
-    {
-        SCHOOLMAP.layers[type] = new GLayer( SCHOOLMAP.layer_config[type] );
-        SCHOOLMAP.map.addOverlay( SCHOOLMAP.layers[type] );
-        var input = document.createElement( "INPUT" );
-        input.type = "checkbox";
-        input.name = input.id = type;
-        input.onchange = function() { SCHOOLMAP.toggleLayer( this ) };
-        if ( input.checked ) SCHOOLMAP.layers[type].show();
-        else SCHOOLMAP.layers[type].hide();
-        div.appendChild( input );
-        var label = document.createElement( "LABEL" );
-        label.htmlFor = type;
-        label.appendChild( document.createTextNode( type ) );
-        div.appendChild( label );
-    }
-};
 
 SCHOOLMAP.createListTd = function( opts ) {
     var td = document.createElement( "TD" );
@@ -921,6 +792,7 @@ SCHOOLMAP.createListRow = function( no, school, result_types )
     tr.appendChild( SCHOOLMAP.createListTd( { "text":school.name, "url":url, "school":school } ) );
     tr.appendChild( SCHOOLMAP.createListTd( { "text":school.PhaseOfEducation, "url":url, "school":school } ) );
     tr.appendChild( SCHOOLMAP.createListTd( { "text":school.school_type, "url":url, "school":school } ) );
+    tr.appendChild( SCHOOLMAP.createListTd( { "text":school.OfstedStatus, "url":url, "school":school } ) );
     for ( var i = 0; i <  result_types.length; i++ )
     {
         var result_type = result_types[i];
@@ -994,13 +866,22 @@ SCHOOLMAP.createListTable = function()
     return table;
 };
 
+SCHOOLMAP.getSymbol = function( colour ) 
+{
+    return {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 10,
+        fillOpacity: 10,
+        strokeWeight: 1,
+        fillColor: colour
+    };
+}
+
 SCHOOLMAP.changeMarkerColour = function( school, colour ) 
 {
     var marker = school.marker;
-    if ( ! marker ) return;
-    var icon = SCHOOLMAP.createIcon( colour, school.no );
-    icon.colour = colour;
-    marker.setImage( icon.image );
+    var symbol = SCHOOLMAP.getSymbol( colour );
+    marker.setIcon( symbol );
 };
 
 SCHOOLMAP.changeLinksColour = function( school, color ) 
